@@ -1,11 +1,15 @@
+import tonic
+from tonic import transforms
+import numpy as np
+import torch
+import sinabs.layers as sl
+from torch.utils.data import DataLoader
+from torch.optim import SGD, Adam
+from torch.nn import CrossEntropyLoss
+from tqdm import tqdm
 #### LOAD DATA ####
 
-import tonic
-from tonic.transforms import ToFrame
-from tonic.datasets import nmnist
-from tonic import transforms
-import os
-import numpy as np
+
 
 root = "/"
 
@@ -22,64 +26,11 @@ events[0].shape
 
 #### DEFINE MODEL ###
 
-import torch
-import torch.nn as nn
-from typing import List
-import sinabs
-import sinabs.layers as sl
+from SNN import DVSGestureNet
 
-
-class DVSGestureNet(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-        conv = []
-        # dimensions at input of IF layer
-        # 64x64, 64x64, 32x32
-        channels = [2, 16, 64, 128, 64, 8]  # 15 is the most we can do for the first conv layer
-        kernel_size = [2, 2, 2, 2, 2]
-        stride = [2, 2, 2, 2, 2]
-
-        for i in range(5):
-            conv.append(nn.Conv2d(channels[i], channels[i + 1], kernel_size=kernel_size[i], stride=stride[i]))
-            conv.append(nn.BatchNorm2d(channels[i + 1]))
-            conv.append(sl.IAFSqueeze(*args, **kwargs))
-            # if i != 0:
-            #  conv.append(sl.SumPool2d(2, 2))
-
-        self.conv_fc = nn.Sequential(
-            *conv,
-
-            nn.Flatten(),
-            nn.Dropout(0.5),
-            nn.Linear(channels[-1] * 4 * 4, 512),
-            sl.IAFSqueeze(*args, **kwargs),
-
-            nn.Dropout(0.5),
-            nn.Linear(512, 110),
-            sl.IAFSqueeze(*args, **kwargs),
-            nn.Linear(110, 11),
-            # sl.SumPool2d((10,1), stride=(10,1)),
-            sl.IAFSqueeze(*args, **kwargs),
-
-        )
-
-    def forward(self, x: torch.Tensor):
-        return self.conv_fc(x)
-
-    def return_sequential(self):
-        return self.conv_fc
-
-
-
-from torch.utils.data import DataLoader
-from torch.optim import SGD, Adam
-from torch.nn import CrossEntropyLoss
-from tqdm import tqdm
-
-epochs = 20
+epochs = 4
 lr = 1e-3
-batch_size = 40
+batch_size = 20
 num_workers = 4
 n_time_steps=16
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -89,7 +40,7 @@ snn_train_dataloader = DataLoader(trainset, batch_size=batch_size, drop_last=Tru
 snn_test_dataloader = DataLoader(testset, batch_size=batch_size, drop_last=True, shuffle=False) #  num_workers=num_workers,
 
 
-net = DVSGestureNet(batch_size=1)
+net = DVSGestureNet(batch_size=batch_size)
 net = net.to(device=device)
 
 optimizer = Adam(params=net.parameters(), lr=lr)
